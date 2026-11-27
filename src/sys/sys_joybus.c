@@ -1,4 +1,5 @@
 #include "sys.h"
+#include "port/mouse_aim.h"
 
 OSContPad gControllerHold[4];
 OSContPad gControllerPress[4];
@@ -78,7 +79,7 @@ void Controller_UpdateInput(void) {
                 gControllerHold[i].err_no = gControllerPress[i].button = gControllerPress[i].stick_x =
                     gControllerPress[i].stick_y = gControllerPress[i].err_no = 0;
         }
-    }
+    }    MouseAim_Update();
 }
 
 void Controller_ReadData(void) {

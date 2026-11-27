@@ -2,6 +2,8 @@ name: Windows Validation
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ "mouse-aim" ]
   pull_request:
     branches: [ "*" ]
 

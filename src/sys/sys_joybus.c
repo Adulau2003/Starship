@@ -61,25 +61,30 @@ void Controller_Init(void) {
     }
 }
 
-// @port: with mouse aim active, the L button banks the wing toward the side the mouse is aiming at
-// (aim left -> Z / tilt left, aim right -> R / tilt right). The direction is latched while L is held, and
-// double-tapping L barrel rolls that way just like Z/R do.
+// @port: with mouse aim active, wing tilt follows the aim. Pressing Z, R or L (any one of them) banks the wing
+// toward the side the mouse is aiming at (aim left -> tilt left, aim right -> tilt right). The side is latched
+// while the button is held, and double-tapping rolls that way like the normal Z/R double-tap.
+// Holding Z and R together is left alone.
 static u16 sAimTiltBit = 0;
 
 static void Controller_AimTilt(s32 i) {
+    const u16 tiltMask = Z_TRIG | R_TRIG | L_TRIG;
+    u16 held;
     f32 aimYaw;
     f32 aimPitch;
 
     if ((i < 0) || (i > 3)) {
         return;
     }
-    if (MouseAim_Active() && MouseAim_AimTiltEnabled() && (gControllerHold[i].button & L_TRIG)) {
+    held = gControllerHold[i].button & tiltMask;
+    if (MouseAim_Active() && MouseAim_AimTiltEnabled() && (held != 0) &&
+        !((held & Z_TRIG) && (held & R_TRIG))) {
         if (sAimTiltBit == 0) {
             MouseAim_GetAngles(&aimYaw, &aimPitch);
             sAimTiltBit = (aimYaw >= 0.0f) ? Z_TRIG : R_TRIG; // positive yaw = aiming left
         }
-        gControllerHold[i].button = (gControllerHold[i].button & ~L_TRIG) | sAimTiltBit;
-        gControllerPress[i].button &= ~L_TRIG;
+        gControllerHold[i].button = (gControllerHold[i].button & ~tiltMask) | sAimTiltBit;
+        gControllerPress[i].button &= ~tiltMask;
         if (!(sPrevController[i].button & sAimTiltBit)) {
             gControllerPress[i].button |= sAimTiltBit;
         }

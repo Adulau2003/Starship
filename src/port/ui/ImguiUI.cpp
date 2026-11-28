@@ -608,6 +608,10 @@ void DrawEnhancementsMenu() {
                            "Left/right mouse buttons can be bound to A/B in the controller settings. "
                            "Open the menu to release the mouse."
             });
+            UIWidgets::CVarCheckbox("L Button Tilts Toward Aim", "gMouseAimTiltL", {
+                .tooltip = "While mouse aim is active, holding L banks the wing toward the side you are aiming (aim left = tilt left, aim right = tilt right). Double-tap L to barrel roll that way.",
+                .defaultValue = true
+            });
             UIWidgets::CVarSliderFloat("Mouse Sensitivity X", "gMouseAimSensX", 0.02f, 0.6f, 0.15f, {
                 .tooltip = "Degrees of aim per mouse pixel", .format = "%.2f", .step = 0.01f
             });

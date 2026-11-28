@@ -1,5 +1,6 @@
 #include "sys.h"
 #include "port/mouse_aim.h"
+#include "sf64context.h"
 
 OSContPad gControllerHold[4];
 OSContPad gControllerPress[4];
@@ -60,6 +61,33 @@ void Controller_Init(void) {
     }
 }
 
+// @port: with mouse aim active, the L button banks the wing toward the side the mouse is aiming at
+// (aim left -> Z / tilt left, aim right -> R / tilt right). The direction is latched while L is held, and
+// double-tapping L barrel rolls that way just like Z/R do.
+static u16 sAimTiltBit = 0;
+
+static void Controller_AimTilt(s32 i) {
+    f32 aimYaw;
+    f32 aimPitch;
+
+    if ((i < 0) || (i > 3)) {
+        return;
+    }
+    if (MouseAim_Active() && MouseAim_AimTiltEnabled() && (gControllerHold[i].button & L_TRIG)) {
+        if (sAimTiltBit == 0) {
+            MouseAim_GetAngles(&aimYaw, &aimPitch);
+            sAimTiltBit = (aimYaw >= 0.0f) ? Z_TRIG : R_TRIG; // positive yaw = aiming left
+        }
+        gControllerHold[i].button = (gControllerHold[i].button & ~L_TRIG) | sAimTiltBit;
+        gControllerPress[i].button &= ~L_TRIG;
+        if (!(sPrevController[i].button & sAimTiltBit)) {
+            gControllerPress[i].button |= sAimTiltBit;
+        }
+    } else {
+        sAimTiltBit = 0;
+    }
+}
+
 // LTODO: Fix this
 #define osContGetStatus(x) true
 
@@ -79,7 +107,10 @@ void Controller_UpdateInput(void) {
                 gControllerHold[i].err_no = gControllerPress[i].button = gControllerPress[i].stick_x =
                     gControllerPress[i].stick_y = gControllerPress[i].err_no = 0;
         }
-    }    MouseAim_Update();
+    }
+
+    MouseAim_Update();
+    Controller_AimTilt(gMainController);
 }
 
 void Controller_ReadData(void) {

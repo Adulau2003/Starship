@@ -15,6 +15,8 @@ int MouseAim_Active(void);
 void MouseAim_GetAngles(float* yaw, float* pitch);
 // 0..1: how much the ship steers toward the aim point (0 = keyboard/stick flies, mouse only aims).
 float MouseAim_FollowStrength(void);
+// Non-zero when the L button should act as a wing tilt toward the side the mouse is aiming at.
+int MouseAim_AimTiltEnabled(void);
 
 #ifdef __cplusplus
 }

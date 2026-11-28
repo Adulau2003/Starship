@@ -135,3 +135,7 @@ extern "C" float MouseAim_FollowStrength(void) {
     }
     return std::clamp(CVarGetFloat("gMouseAimFollow", 0.0f), 0.0f, 1.0f);
 }
+
+extern "C" int MouseAim_AimTiltEnabled(void) {
+    return CVarGetInteger("gMouseAimTiltL", 1) != 0 ? 1 : 0;
+}

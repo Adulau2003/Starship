@@ -603,8 +603,8 @@ void DrawEnhancementsMenu() {
             UIWidgets::CVarCheckbox("Use red radio backgrounds for enemies.", "gEnemyRedRadio");
             UIWidgets::CVarSliderInt("Cockpit Glass Opacity: %d", "gCockpitOpacity", 0, 255, 120);
 
-            UIWidgets::CVarCheckbox("Mouse Aim (Arwing rail stages)", "gMouseAim", {
-                .tooltip = "Aim with the mouse. The reticle and your shots follow the mouse independently of the ship's heading. "
+            UIWidgets::CVarCheckbox("Mouse Aim (Arwing)", "gMouseAim", {
+                .tooltip = "Aim with the mouse (rail stages and all-range mode). The reticle and your shots follow the mouse independently of the ship's heading. "
                            "Left/right mouse buttons can be bound to A/B in the controller settings. "
                            "Open the menu to release the mouse."
             });
@@ -622,6 +622,10 @@ void DrawEnhancementsMenu() {
             });
             UIWidgets::CVarSliderFloat("Ship Follows Aim", "gMouseAimFollow", 0.0f, 1.0f, 0.0f, {
                 .tooltip = "0 = keyboard/stick flies the ship, mouse only aims. 1 = ship also steers toward where you aim (mouse-only play).",
+                .format = "%.2f", .step = 0.05f
+            });
+            UIWidgets::CVarSliderFloat("Ship Follows Aim (All-Range)", "gMouseAimFollowAllRange", 0.0f, 1.0f, 1.0f, {
+                .tooltip = "All-range mode: how strongly the ship turns and pitches toward where you aim. Leave at 1 for mouse flight.",
                 .format = "%.2f", .step = 0.05f
             });
             

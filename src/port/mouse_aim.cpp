@@ -18,6 +18,8 @@ float sTargetYaw = 0.0f;
 float sTargetPitch = 0.0f;
 float sYaw = 0.0f;
 float sPitch = 0.0f;
+float sAimWorldYaw = 0.0f; // all-range only: aim direction in world space (degrees)
+bool sWasAllRange = false;
 bool sCaptured = false;
 
 bool Enabled() {
@@ -25,8 +27,24 @@ bool Enabled() {
 }
 
 bool InFlight() {
-    return gPlayer != nullptr && gGameState == GSTATE_PLAY && gLevelMode == LEVELMODE_ON_RAILS && !gVersusMode &&
+    return gPlayer != nullptr && gGameState == GSTATE_PLAY &&
+           (gLevelMode == LEVELMODE_ON_RAILS || gLevelMode == LEVELMODE_ALL_RANGE) && !gVersusMode &&
            gPlayer[0].form == FORM_ARWING && gPlayer[0].state == PLAYERSTATE_ACTIVE;
+}
+
+bool AllRange() {
+    return gLevelMode == LEVELMODE_ALL_RANGE;
+}
+
+// wrap an angle in degrees to [-180, 180]
+float Wrap180(float a) {
+    while (a > 180.0f) {
+        a -= 360.0f;
+    }
+    while (a < -180.0f) {
+        a += 360.0f;
+    }
+    return a;
 }
 
 void SetCapture(bool capture) {
@@ -52,8 +70,18 @@ extern "C" void MouseAim_Update(void) {
 
     if (!flying) {
         sTargetYaw = sTargetPitch = sYaw = sPitch = 0.0f;
+        sWasAllRange = false;
         return;
     }
+
+    // All-range: start aiming straight ahead whenever we (re)enter that mode.
+    if (AllRange() && !sWasAllRange) {
+        sAimWorldYaw = gPlayer[0].yRot_114;
+        sTargetPitch = sPitch = gPlayer[0].rot.x;
+    } else if (!AllRange() && sWasAllRange) {
+        sTargetYaw = sTargetPitch = sYaw = sPitch = 0.0f;
+    }
+    sWasAllRange = AllRange();
     if (menuOpen) {
         return; // freeze aim while the menu is up
     }
@@ -65,10 +93,19 @@ extern "C" void MouseAim_Update(void) {
     const float range = CVarGetFloat("gMouseAimRange", 40.0f);
 
     // Mouse right -> rot.y decreases, mouse up -> rot.x decreases (matches stick right / stick up).
-    sTargetYaw -= static_cast<float>(delta.x) * sensX;
     sTargetPitch += static_cast<float>(delta.y) * sensY * invert;
-    sTargetYaw = std::clamp(sTargetYaw, -range, range);
     sTargetPitch = std::clamp(sTargetPitch, -range, range);
+    if (AllRange()) {
+        // The ship turns toward the aim, so keep the aim in world space and express it relative to the heading.
+        const float heading = gPlayer[0].yRot_114;
+        sAimWorldYaw -= static_cast<float>(delta.x) * sensX;
+        float rel = std::clamp(Wrap180(sAimWorldYaw - heading), -range, range);
+        sAimWorldYaw = heading + rel; // the aim can drag the heading around once it hits the edge of the cone
+        sTargetYaw = rel;
+    } else {
+        sTargetYaw -= static_cast<float>(delta.x) * sensX;
+        sTargetYaw = std::clamp(sTargetYaw, -range, range);
+    }
 
     // Optional frame-time-independent smoothing (time constant in ms, 0 = raw).
     const float tauMs = CVarGetFloat("gMouseAimSmoothing", 0.0f);
@@ -92,5 +129,9 @@ extern "C" void MouseAim_GetAngles(float* yaw, float* pitch) {
 }
 
 extern "C" float MouseAim_FollowStrength(void) {
+    // All-range has no fixed path, so the ship has to turn toward the aim for mouse flight to work at all.
+    if (AllRange()) {
+        return std::clamp(CVarGetFloat("gMouseAimFollowAllRange", 1.0f), 0.0f, 1.0f);
+    }
     return std::clamp(CVarGetFloat("gMouseAimFollow", 0.0f), 0.0f, 1.0f);
 }

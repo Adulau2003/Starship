@@ -3767,6 +3767,20 @@ void Player_MoveArwing360(Player* player) {
 
     sp78 = gInputPress->stick_y * (CVarGetInteger("gInvertYAxis", 0) == 1 ? -1 : 1);
 
+    // @port: all-range mouse flight - turn and pitch toward the mouse aim point
+    // (rot.y target = sp7C * 0.68, rot.x target = -sp78 * 0.68)
+    if ((player == gPlayer) && MouseAim_Active() && (MouseAim_FollowStrength() > 0.0f)) {
+        f32 aimYawDeg;
+        f32 aimPitchDeg;
+        f32 follow = MouseAim_FollowStrength();
+
+        MouseAim_GetAngles(&aimYawDeg, &aimPitchDeg);
+        sp7C += (aimYawDeg / 0.68f) * follow;
+        sp78 += (-aimPitchDeg / 0.68f) * follow;
+        sp7C = CLAMP(sp7C, -60.0f, 60.0f);
+        sp78 = CLAMP(sp78, -60.0f, 60.0f);
+    }
+
     Math_SmoothStepToAngle(&player->aerobaticPitch, 0.0f, 0.1f, 5.0f, 0.01f);
     Matrix_RotateZ(gCalcMatrix, -player->zRotBank * M_DTOR, MTXF_NEW);
 

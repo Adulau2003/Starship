@@ -22,6 +22,7 @@
 #include "assets/ast_area_6.h"
 #include "assets/ast_zoness.h"
 #include "port/hooks/Events.h"
+#include "port/mouse_aim.h"
 
 extern float gCurrentScreenWidth;
 extern float gCurrentScreenHeight;
@@ -3017,11 +3018,18 @@ void Player_SetupArwingShot(Player* player, PlayerShot* shot, f32 arg2, f32 arg3
     Vec3f sp44;
     Vec3f sp38;
     Vec3f sp2C;
+    f32 aimYaw = player->rot.y;
+    f32 aimPitch = player->rot.x;
 
     PlayerShot_Initialize(shot);
 
-    Matrix_RotateY(gCalcMatrix, (player->yRot_114 + player->rot.y + 180.0f) * M_DTOR, MTXF_NEW);
-    Matrix_RotateX(gCalcMatrix, -((player->xRot_120 + player->rot.x + player->aerobaticPitch) * M_DTOR), MTXF_APPLY);
+    // @port: mouse look decouples the shot direction from the ship's heading
+    if ((player == gPlayer) && MouseAim_Active()) {
+        MouseAim_GetAngles(&aimYaw, &aimPitch);
+    }
+
+    Matrix_RotateY(gCalcMatrix, (player->yRot_114 + aimYaw + 180.0f) * M_DTOR, MTXF_NEW);
+    Matrix_RotateX(gCalcMatrix, -((player->xRot_120 + aimPitch + player->aerobaticPitch) * M_DTOR), MTXF_APPLY);
     Matrix_RotateZ(gCalcMatrix, -((player->bankAngle + player->rockAngle) * M_DTOR), MTXF_APPLY);
 
     Matrix_Translate(gCalcMatrix, player->xShake, player->yBob, 0.0f, MTXF_APPLY);
@@ -3063,21 +3071,21 @@ void Player_SetupArwingShot(Player* player, PlayerShot* shot, f32 arg2, f32 arg3
         shot->obj.pos.z = player->trueZpos + sp2C.z + (sp38.z * 1.2f);
     }
 
-    shot->obj.rot.x = player->xRot_120 + player->rot.x + player->aerobaticPitch;
-    shot->obj.rot.y = player->rot.y + player->yRot_114;
+    shot->obj.rot.x = player->xRot_120 + aimPitch + player->aerobaticPitch;
+    shot->obj.rot.y = aimYaw + player->yRot_114;
     shot->obj.rot.z = player->bankAngle;
 
     if (shotId == PLAYERSHOT_LOCK_ON) {
         if (gCurrentLevel == LEVEL_AQUAS) {
             shot->unk_58 = RAND_INT(360.0f);
             shot->unk_60 = RAND_INT(360.0f);
-            shot->vec_2C.x = player->rot.x + player->aerobaticPitch;
-            shot->vec_2C.y = player->rot.y;
+            shot->vec_2C.x = aimPitch + player->aerobaticPitch;
+            shot->vec_2C.y = aimYaw;
             shot->vec_2C.z = player->bankAngle;
             shot->unk_5C = D_ctx_80178494;
         } else {
-            shot->vec_2C.y = player->rot.y + player->yRot_114;
-            shot->vec_2C.x = player->rot.x + player->aerobaticPitch;
+            shot->vec_2C.y = aimYaw + player->yRot_114;
+            shot->vec_2C.x = aimPitch + player->aerobaticPitch;
             if (speed <= 65.0f) {
                 shot->unk_5C = 1;
             }
@@ -3759,6 +3767,20 @@ void Player_MoveArwing360(Player* player) {
 
     sp78 = gInputPress->stick_y * (CVarGetInteger("gInvertYAxis", 0) == 1 ? -1 : 1);
 
+    // @port: all-range mouse flight - turn and pitch toward the mouse aim point
+    // (rot.y target = sp7C * 0.68, rot.x target = -sp78 * 0.68)
+    if ((player == gPlayer) && MouseAim_Active() && (MouseAim_FollowStrength() > 0.0f)) {
+        f32 aimYawDeg;
+        f32 aimPitchDeg;
+        f32 follow = MouseAim_FollowStrength();
+
+        MouseAim_GetAngles(&aimYawDeg, &aimPitchDeg);
+        sp7C += (aimYawDeg / 0.68f) * follow;
+        sp78 += (-aimPitchDeg / 0.68f) * follow;
+        sp7C = CLAMP(sp7C, -60.0f, 60.0f);
+        sp78 = CLAMP(sp78, -60.0f, 60.0f);
+    }
+
     Math_SmoothStepToAngle(&player->aerobaticPitch, 0.0f, 0.1f, 5.0f, 0.01f);
     Matrix_RotateZ(gCalcMatrix, -player->zRotBank * M_DTOR, MTXF_NEW);
 
@@ -4004,6 +4026,18 @@ void Player_MoveArwingOnRails(Player* player) {
 
     stickX = -gInputPress->stick_x;
     stickY = gInputPress->stick_y * (CVarGetInteger("gInvertYAxis", 0) == 1 ? -1 : 1);
+    // @port: optional ship steering toward the mouse aim point (rot.y target = stickX * 0.68, rot.x = -stickY * 0.68)
+    if ((player == gPlayer) && MouseAim_Active() && (MouseAim_FollowStrength() > 0.0f)) {
+        f32 aimYawDeg;
+        f32 aimPitchDeg;
+        f32 follow = MouseAim_FollowStrength();
+
+        MouseAim_GetAngles(&aimYawDeg, &aimPitchDeg);
+        stickX += (aimYawDeg / 0.68f) * follow;
+        stickY += (-aimPitchDeg / 0.68f) * follow;
+        stickX = CLAMP(stickX, -60.0f, 60.0f);
+        stickY = CLAMP(stickY, -60.0f, 60.0f);
+    }
 
     Math_SmoothStepToAngle(&player->aerobaticPitch, 0.0f, 0.1f, 5.0f, 0.01f);
 
@@ -4204,10 +4238,24 @@ void Player_MoveTank360(Player* player) {
         player->unk_180 -= 3.0f;
     }
 
+    // @port: mouse aim drives the cannon turret (the reticle and shots are derived from it)
+    if ((player == gPlayer) && MouseAim_Active()) {
+        MouseAim_TankTurret(player->rot.y, &player->unk_180, &player->unk_17C);
+    }
+
     gPlayerTurnRate = 3.0f;
     gPlayerTurnStickMod = 0.6666f;
 
     sp5C = gInputPress->stick_x;
+    // @port: all-range tank steering toward the mouse aim
+    if ((player == gPlayer) && MouseAim_Active() && (MouseAim_FollowStrength() > 0.0f)) {
+        f32 aimYawDeg;
+        f32 aimPitchDeg;
+
+        MouseAim_GetAngles(&aimYawDeg, &aimPitchDeg);
+        sp5C += (-aimYawDeg / gPlayerTurnStickMod) * MouseAim_FollowStrength();
+        sp5C = CLAMP(sp5C, -60.0f, 60.0f);
+    }
     if (sp5C == 0) {
         Math_SmoothStepToF(&player->rot.y, -sp5C * gPlayerTurnStickMod, 0.1f, gPlayerTurnRate * 0.5f, 0.1f);
     } else {

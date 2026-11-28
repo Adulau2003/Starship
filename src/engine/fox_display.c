@@ -8,12 +8,34 @@
 #include "port/interpolation/FrameInterpolation.h"
 #include "port/hooks/list/EngineEvent.h"
 #include "port/mods/PortEnhancements.h"
+#include "port/mouse_aim.h"
 
 // f32 path1 = 0.0f;
 // f32 path2 = 0.0f;
 
 Vec3f D_display_801613B0[4];
 Vec3f D_display_801613E0[4];
+
+// @port: player's parent transform (ship position, before the ship's own rotations); used for mouse-look reticles
+static Matrix sPlayerParentMtx;
+
+// @port: place a reticle `dist` units ahead of the ship along the mouse aim direction instead of the ship's heading
+static void Display_MouseAimReticle(Player* player, f32 dist, Vec3f* out) {
+    f32 aimYaw;
+    f32 aimPitch;
+    Vec3f fwd = { 0.0f, 0.0f, dist };
+    Vec3f dir;
+
+    MouseAim_GetAngles(&aimYaw, &aimPitch);
+    Matrix_RotateY(gCalcMatrix, (player->yRot_114 + aimYaw + 180.0f) * M_DTOR, MTXF_NEW);
+    Matrix_RotateX(gCalcMatrix, -((player->xRot_120 + aimPitch + player->aerobaticPitch) * M_DTOR), MTXF_APPLY);
+    Matrix_MultVec3fNoTranslate(gCalcMatrix, &fwd, &dir);
+
+    Matrix_Push(&gGfxMatrix);
+    Matrix_Copy(gGfxMatrix, &sPlayerParentMtx);
+    Matrix_MultVec3f(gGfxMatrix, &dir, out);
+    Matrix_Pop(&gGfxMatrix);
+}
 s16 gReflectY;
 Matrix D_display_80161418[4];
 Vec3f D_display_80161518[4];
@@ -746,9 +768,14 @@ void Display_Arwing(Player* player, s32 reflectY) {
         sp4C.x = 0.0f;
         sp4C.y = 0.0f;
         sp4C.z = 1200.0f;
-        Matrix_MultVec3f(gGfxMatrix, &sp4C, &D_display_801613E0[0]);
-        sp4C.z = 2400.0f + sp48;
-        Matrix_MultVec3f(gGfxMatrix, &sp4C, &D_display_801613E0[1]);
+        if ((player == gPlayer) && MouseAim_Active()) {
+            Display_MouseAimReticle(player, 1200.0f, &D_display_801613E0[0]);
+            Display_MouseAimReticle(player, 2400.0f + sp48, &D_display_801613E0[1]);
+        } else {
+            Matrix_MultVec3f(gGfxMatrix, &sp4C, &D_display_801613E0[0]);
+            sp4C.z = 2400.0f + sp48;
+            Matrix_MultVec3f(gGfxMatrix, &sp4C, &D_display_801613E0[1]);
+        }
     }
 
     if (player->alternateView && (gLevelMode == LEVELMODE_ON_RAILS) &&
@@ -1536,6 +1563,7 @@ void Display_Player_Update(Player* player, s32 reflectY) {
                 Matrix_Pop(&gGfxMatrix);
                 return;
             }
+            Matrix_Copy(&sPlayerParentMtx, gGfxMatrix); // @port
             Matrix_RotateY(gGfxMatrix, (player->yRot_114 + player->rot.y + player->damageShake + 180.0f) * M_DTOR,
                            MTXF_APPLY);
             Matrix_RotateX(

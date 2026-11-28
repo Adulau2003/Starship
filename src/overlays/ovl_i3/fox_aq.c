@@ -8,6 +8,7 @@
 #include "assets/ast_blue_marine.h"
 #include "assets/ast_aquas.h"
 #include "port/hooks/Events.h"
+#include "port/mouse_aim.h"
 // #include "prevent_bss_reordering2.h"
 
 const char D_i3_801C1A30[] = "プレイヤーのすべてをクリア \n"; // Clear of all players
@@ -592,8 +593,15 @@ void Aquas_801A9ED0(Player* player) {
     Vec3f sp64;
     f32* tempy;
 
-    Matrix_RotateY(gCalcMatrix, (player->yRot_114 + player->rot.y) * M_DTOR, MTXF_NEW);
-    Matrix_RotateX(gCalcMatrix, player->rot.x * M_DTOR, MTXF_APPLY);
+    f32 aimYaw = player->rot.y;
+    f32 aimPitch = player->rot.x;
+
+    // @port: mouse aim decouples the lock-on search from the ship's heading
+    if ((player == gPlayer) && MouseAim_Active()) {
+        MouseAim_GetAngles(&aimYaw, &aimPitch);
+    }
+    Matrix_RotateY(gCalcMatrix, (player->yRot_114 + aimYaw) * M_DTOR, MTXF_NEW);
+    Matrix_RotateX(gCalcMatrix, aimPitch * M_DTOR, MTXF_APPLY);
 
     sp70.x = 0.0f;
     sp70.y = 0.0f;
@@ -882,6 +890,20 @@ void Aquas_BlueMarineMove(Player* player) {
     stickX = -gInputPress->stick_x;
 
     stickY = +gInputPress->stick_y * (CVarGetInteger("gInvertYAxis", 0) == 1 ? -1 : 1);
+
+    // @port: optional Blue Marine steering toward the mouse aim (rot.y target = stickX * 0.68,
+    // rot.x target = -stickY * 0.544)
+    if ((player == gPlayer) && MouseAim_Active() && (MouseAim_FollowStrength() > 0.0f)) {
+        f32 aimYawDeg;
+        f32 aimPitchDeg;
+        f32 follow = MouseAim_FollowStrength();
+
+        MouseAim_GetAngles(&aimYawDeg, &aimPitchDeg);
+        stickX += (aimYawDeg / 0.68f) * follow;
+        stickY += (-aimPitchDeg / 0.544f) * follow;
+        stickX = CLAMP(stickX, -60.0f, 60.0f);
+        stickY = CLAMP(stickY, -60.0f, 60.0f);
+    }
 
     gPlayerTurnStickMod = 0.68f;
 
@@ -1264,8 +1286,18 @@ void Aquas_BlueMarineShoot(Player* player) {
         D_i3_801C4190[5] = D_i3_801C4190[3] = 0;
     }
 
-    Matrix_RotateY(gCalcMatrix, (player->rot.y + player->yRot_114) * M_DTOR, MTXF_NEW);
-    Matrix_RotateX(gCalcMatrix, player->rot.x * M_DTOR, MTXF_APPLY);
+    // @port: mouse aim places the reticle along the aim direction instead of the ship's heading
+    if ((player == gPlayer) && MouseAim_Active()) {
+        f32 mouseYaw;
+        f32 mousePitch;
+
+        MouseAim_GetAngles(&mouseYaw, &mousePitch);
+        Matrix_RotateY(gCalcMatrix, (mouseYaw + player->yRot_114) * M_DTOR, MTXF_NEW);
+        Matrix_RotateX(gCalcMatrix, mousePitch * M_DTOR, MTXF_APPLY);
+    } else {
+        Matrix_RotateY(gCalcMatrix, (player->rot.y + player->yRot_114) * M_DTOR, MTXF_NEW);
+        Matrix_RotateX(gCalcMatrix, player->rot.x * M_DTOR, MTXF_APPLY);
+    }
 
     sp68.x = 0.0f;
     sp68.y = 0.0f;

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "port/mouse_aim.h"
 #include "assets/ast_landmaster.h"
 #include "assets/ast_titania.h"
 #include "port/hooks/Events.h"
@@ -401,9 +402,22 @@ void func_tank_80044868(Player* player) {
     if (player->unk_180 > 0.0f) {
         player->unk_180 -= 3.0f;
     }
+    // @port: mouse aim drives the cannon turret (the reticle and shots are derived from it)
+    if ((player == gPlayer) && MouseAim_Active()) {
+        MouseAim_TankTurret(player->rot.y, &player->unk_180, &player->unk_17C);
+    }
     gPlayerTurnRate = 3.0f;
     gPlayerTurnStickMod = 0.66f;
     stickTilt = gInputPress->stick_x;
+    // @port: optional tank steering toward the mouse aim (rot.y target = -stick_x * mod)
+    if ((player == gPlayer) && MouseAim_Active() && (MouseAim_FollowStrength() > 0.0f)) {
+        f32 aimYawDeg;
+        f32 aimPitchDeg;
+
+        MouseAim_GetAngles(&aimYawDeg, &aimPitchDeg);
+        stickTilt += (-aimYawDeg / gPlayerTurnStickMod) * MouseAim_FollowStrength();
+        stickTilt = CLAMP(stickTilt, -60.0f, 60.0f);
+    }
     if (stickTilt == 0.0f) {
         Math_SmoothStepToF(&player->rot.y, -stickTilt * gPlayerTurnStickMod, 0.1f, gPlayerTurnRate * 0.5f, 0.1f);
     } else {

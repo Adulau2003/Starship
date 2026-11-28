@@ -17,6 +17,9 @@ void MouseAim_GetAngles(float* yaw, float* pitch);
 float MouseAim_FollowStrength(void);
 // Non-zero when the L button should act as a wing tilt toward the side the mouse is aiming at.
 int MouseAim_AimTiltEnabled(void);
+// Landmaster: drive the cannon turret. bodyYaw = tank's player->rot.y. Writes the turret yaw (unk_180) and
+// pitch (unk_17C), which the game already uses for both the reticle and the shot direction.
+void MouseAim_TankTurret(float bodyYaw, float* turretYaw, float* turretPitch);
 
 #ifdef __cplusplus
 }

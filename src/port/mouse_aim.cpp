@@ -27,9 +27,13 @@ bool Enabled() {
 }
 
 bool InFlight() {
-    return gPlayer != nullptr && gGameState == GSTATE_PLAY &&
-           (gLevelMode == LEVELMODE_ON_RAILS || gLevelMode == LEVELMODE_ALL_RANGE) && !gVersusMode &&
-           gPlayer[0].form == FORM_ARWING && gPlayer[0].state == PLAYERSTATE_ACTIVE;
+    if (gPlayer == nullptr || gGameState != GSTATE_PLAY || gVersusMode ||
+        (gLevelMode != LEVELMODE_ON_RAILS && gLevelMode != LEVELMODE_ALL_RANGE) ||
+        gPlayer[0].state != PLAYERSTATE_ACTIVE) {
+        return false;
+    }
+    const auto form = gPlayer[0].form;
+    return form == FORM_ARWING || form == FORM_LANDMASTER || form == FORM_BLUE_MARINE;
 }
 
 bool AllRange() {
@@ -137,5 +141,16 @@ extern "C" float MouseAim_FollowStrength(void) {
 }
 
 extern "C" int MouseAim_AimTiltEnabled(void) {
+    // The Landmaster uses Z/R for its jets and rolls, so leave those alone there.
+    if (gPlayer != nullptr && gPlayer[0].form == FORM_LANDMASTER) {
+        return 0;
+    }
     return CVarGetInteger("gMouseAimTiltL", 1) != 0 ? 1 : 0;
+}
+
+extern "C" void MouseAim_TankTurret(float bodyYaw, float* turretYaw, float* turretPitch) {
+    // Turret yaw is relative to the tank body: total yaw = bodyYaw - turretYaw (same convention as rot.y).
+    *turretYaw = std::clamp(bodyYaw - sYaw, -90.0f, 90.0f);
+    // Stick-equivalent mapping from the game: unk_17C = stick * 0.7 - 8, limited to [-40, 0]; stick = -pitch / 0.68.
+    *turretPitch = std::clamp(-sPitch * (0.7f / 0.68f) - 8.0f, -40.0f, 0.0f);
 }

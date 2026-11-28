@@ -4238,10 +4238,24 @@ void Player_MoveTank360(Player* player) {
         player->unk_180 -= 3.0f;
     }
 
+    // @port: mouse aim drives the cannon turret (the reticle and shots are derived from it)
+    if ((player == gPlayer) && MouseAim_Active()) {
+        MouseAim_TankTurret(player->rot.y, &player->unk_180, &player->unk_17C);
+    }
+
     gPlayerTurnRate = 3.0f;
     gPlayerTurnStickMod = 0.6666f;
 
     sp5C = gInputPress->stick_x;
+    // @port: all-range tank steering toward the mouse aim
+    if ((player == gPlayer) && MouseAim_Active() && (MouseAim_FollowStrength() > 0.0f)) {
+        f32 aimYawDeg;
+        f32 aimPitchDeg;
+
+        MouseAim_GetAngles(&aimYawDeg, &aimPitchDeg);
+        sp5C += (-aimYawDeg / gPlayerTurnStickMod) * MouseAim_FollowStrength();
+        sp5C = CLAMP(sp5C, -60.0f, 60.0f);
+    }
     if (sp5C == 0) {
         Math_SmoothStepToF(&player->rot.y, -sp5C * gPlayerTurnStickMod, 0.1f, gPlayerTurnRate * 0.5f, 0.1f);
     } else {
